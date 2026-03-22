@@ -1,0 +1,224 @@
+local CommandParser = {}
+
+-- Helper function to find a player name in the message
+local function findPlayerName(words, startIndex)
+    for i = startIndex, #words do
+        local word = words[i]
+        -- Skip common non-name words
+        if word ~= "me" and word ~= "all" and word ~= "money" and word ~= "to" and word ~= "like" and word ~= "look" and not tonumber(word) then
+            return word, i
+        end
+    end
+    return nil, nil
+end
+
+-- Helper function to find a number in the message
+local function findNumber(words, startIndex)
+    for i = startIndex, #words do
+        local num = tonumber(words[i])
+        if num then
+            return num, i
+        end
+    end
+    return nil, nil
+end
+
+function CommandParser.parse(message, speaker)
+    local lowerMessage = string.lower(message)
+    
+    -- Parse command and arguments
+    local words = {}
+    for word in string.gmatch(lowerMessage, "%S+") do
+        table.insert(words, word)
+    end
+    
+    if #words == 0 then
+        return nil
+    end
+    
+    -- KICK command
+    if words[1] == "kick" then
+        local targetName = words[2]
+        local reason = "Kicked by admin"
+        if #words > 2 then
+            local reasonParts = {}
+            for i = 3, #words do
+                table.insert(reasonParts, words[i])
+            end
+            reason = table.concat(reasonParts, " ")
+        end
+        return {command = "kick", target = targetName, reason = reason}
+    end
+    
+    -- BAN command
+    if words[1] == "ban" then
+        local targetName = words[2]
+        local reason = "Banned by admin"
+        if #words > 2 then
+            local reasonParts = {}
+            for i = 3, #words do
+                table.insert(reasonParts, words[i])
+            end
+            reason = table.concat(reasonParts, " ")
+        end
+        return {command = "ban", target = targetName, reason = reason}
+    end
+    
+    -- FLY command: "fly", "fly player", "give me fly", "give player fly"
+    if words[1] == "fly" then
+        local targetName = words[2] or speaker.Name
+        return {command = "fly", target = targetName}
+    elseif words[1] == "give" then
+        if words[2] == "me" and words[3] == "fly" then
+            return {command = "fly", target = speaker.Name}
+        elseif words[3] == "fly" then
+            return {command = "fly", target = words[2]}
+        end
+    end
+    
+    -- SPEED command: "speed number", "speed player number", "set speed to number"
+    if words[1] == "speed" then
+        if words[2] and tonumber(words[2]) then
+            return {command = "speed", target = speaker.Name, speed = tonumber(words[2])}
+        elseif words[2] and words[3] and tonumber(words[3]) then
+            return {command = "speed", target = words[2], speed = tonumber(words[3])}
+        end
+    elseif words[1] == "set" and words[2] == "speed" then
+        local num = findNumber(words, 3)
+        if num then
+            return {command = "speed", target = speaker.Name, speed = num}
+        end
+    end
+    
+    -- TELEPORT command: "tp player1 player2", "teleport player1 player2", "to player", "bring player"
+    if words[1] == "tp" or words[1] == "teleport" then
+        if words[2] and words[3] then
+            return {command = "tp", target = words[2], destination = words[3]}
+        elseif words[2] then
+            return {command = "tp", target = words[2], destination = speaker.Name}
+        end
+    elseif words[1] == "to" and words[2] then
+        return {command = "tp", target = speaker.Name, destination = words[2]}
+    elseif words[1] == "bring" and words[2] then
+        return {command = "tp", target = words[2], destination = speaker.Name}
+    end
+    
+    -- KILL command: "kill player", "kill me", "slay player"
+    if words[1] == "kill" or words[1] == "slay" then
+        local targetName = words[2] or speaker.Name
+        if targetName == "me" then targetName = speaker.Name end
+        return {command = "kill", target = targetName}
+    end
+    
+    -- HEAL command: "heal player", "heal me", "heal"
+    if words[1] == "heal" then
+        local targetName = words[2] or speaker.Name
+        if targetName == "me" then targetName = speaker.Name end
+        return {command = "heal", target = targetName}
+    end
+    
+    -- GOD command: "god player", "god me", "god", "godmode player"
+    if words[1] == "god" or words[1] == "godmode" then
+        local targetName = words[2] or speaker.Name
+        if targetName == "me" then targetName = speaker.Name end
+        return {command = "god", target = targetName}
+    end
+    
+    -- UNGOD command: "ungod player", "ungod me", "ungod"
+    if words[1] == "ungod" then
+        local targetName = words[2] or speaker.Name
+        if targetName == "me" then targetName = speaker.Name end
+        return {command = "ungod", target = targetName}
+    end
+    
+    -- INVISIBLE command: "invisible player", "invis player", "vanish player"
+    if words[1] == "invisible" or words[1] == "invis" or words[1] == "vanish" then
+        local targetName = words[2] or speaker.Name
+        if targetName == "me" then targetName = speaker.Name end
+        return {command = "invisible", target = targetName}
+    end
+    
+    -- VISIBLE command: "visible player", "vis player", "appear player"
+    if words[1] == "visible" or words[1] == "vis" or words[1] == "appear" then
+        local targetName = words[2] or speaker.Name
+        if targetName == "me" then targetName = speaker.Name end
+        return {command = "visible", target = targetName}
+    end
+    
+    -- FREEZE command: "freeze player"
+    if words[1] == "freeze" then
+        local targetName = words[2] or speaker.Name
+        if targetName == "me" then targetName = speaker.Name end
+        return {command = "freeze", target = targetName}
+    end
+    
+    -- THAW command: "thaw player", "unfreeze player"
+    if words[1] == "thaw" or words[1] == "unfreeze" then
+        local targetName = words[2] or speaker.Name
+        if targetName == "me" then targetName = speaker.Name end
+        return {command = "thaw", target = targetName}
+    end
+    
+    -- GIVE MONEY command: flexible parsing
+    -- "give player money amount", "give me money amount", "give me amount", "give player amount"
+    -- "give amount", "money amount", "add money amount", "set money amount"
+    if words[1] == "give" then
+        local amount = findNumber(words, 2)
+        if amount then
+            -- "give me 100000000" or "give player 100"
+            local targetName = words[2]
+            if targetName == "money" then
+                targetName = speaker.Name
+            elseif targetName == "me" then
+                targetName = speaker.Name
+            elseif tonumber(targetName) then
+                targetName = speaker.Name
+            end
+            return {command = "givemoney", target = targetName, amount = amount}
+        end
+    elseif words[1] == "money" and words[2] and tonumber(words[2]) then
+        -- "money 1000" - give self money
+        return {command = "givemoney", target = speaker.Name, amount = tonumber(words[2])}
+    elseif words[1] == "add" and words[2] == "money" and words[3] and tonumber(words[3]) then
+        -- "add money 1000"
+        return {command = "givemoney", target = speaker.Name, amount = tonumber(words[3])}
+    elseif words[1] == "set" and words[2] == "money" and words[3] and tonumber(words[3]) then
+        -- "set money 1000"
+        return {command = "setmoney", target = speaker.Name, amount = tonumber(words[3])}
+    end
+    
+    -- RESET MONEY command: "resetmoney player", "resetmoney", "reset money player"
+    if words[1] == "resetmoney" or (words[1] == "reset" and words[2] == "money") then
+        local targetName = words[2]
+        if words[1] == "reset" then
+            targetName = words[3] or speaker.Name
+        end
+        if targetName == "me" then targetName = speaker.Name end
+        return {command = "resetmoney", target = targetName}
+    end
+    
+    -- LOOK LIKE command: "looklike player", "look like player", "copy player", "clone player"
+    if words[1] == "looklike" then
+        return {command = "looklike", target = speaker.Name, lookLike = words[2]}
+    elseif words[1] == "look" and words[2] == "like" and words[3] then
+        return {command = "looklike", target = speaker.Name, lookLike = words[3]}
+    elseif words[1] == "copy" and words[2] then
+        return {command = "looklike", target = speaker.Name, lookLike = words[2]}
+    elseif words[1] == "clone" and words[2] then
+        return {command = "looklike", target = speaker.Name, lookLike = words[2]}
+    end
+    
+    -- TO ME command: "tome player", "bring player"
+    if words[1] == "tome" and words[2] then
+        return {command = "tp", target = words[2], destination = speaker.Name}
+    end
+    
+    -- TO ALL command: "toall player", "bring all to player"
+    if words[1] == "toall" and words[2] then
+        return {command = "toall", target = words[2]}
+    end
+    
+    return nil
+end
+
+return CommandParser
